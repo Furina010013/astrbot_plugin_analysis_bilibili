@@ -1,14 +1,80 @@
-# astrbot-plugin-helloworld
 
-AstrBot 插件模板 / A template plugin for AstrBot plugin feature
 
-> [!NOTE]
-> This repo is just a template of [AstrBot](https://github.com/AstrBotDevs/AstrBot) Plugin.
-> 
-> [AstrBot](https://github.com/AstrBotDevs/AstrBot) is an agentic assistant for both personal and group conversations. It can be deployed across dozens of mainstream instant messaging platforms, including QQ, Telegram, Feishu, DingTalk, Slack, LINE, Discord, Matrix, etc. In addition, it provides a reliable and extensible conversational AI infrastructure for individuals, developers, and teams. Whether you need a personal AI companion, an intelligent customer support agent, an automation assistant, or an enterprise knowledge base, AstrBot enables you to quickly build AI applications directly within your existing messaging workflows.
+# astrbot_plugin_analysis_bilibili
 
-# Supports
+###  B 站解析与下载插件
 
-- [AstrBot Repo](https://github.com/AstrBotDevs/AstrBot)
-- [AstrBot Plugin Development Docs (Chinese)](https://docs.astrbot.app/dev/star/plugin-new.html)
-- [AstrBot Plugin Development Docs (English)](https://docs.astrbot.app/en/dev/star/plugin-new.html)
+这是一个基于 AstrBot 框架的 Bilibili 视频解析插件。它不仅能自动识别聊天中的 B 站链接，还能通过精致的 **Markdown 表格** 展示视频数据，并根据视频时长自动切换 **“发送文件”** 或 **“发送封面”** 模式。
+
+## ✨ 核心特性
+
+### 1. 🚀 智能分流决策 (Duration Shunting)
+
+为了平衡用户体验与服务器流量，插件内置了 300 秒（5分钟）的逻辑分水岭：
+
+- **短视频 (≤ 300s)**：自动解析无水印直链 -> 下载至本地 -> 发送视频文件。
+- **长视频 (> 300s)**：自动下载高清封面 -> 发送封面图 -> 提示“时长过长”。
+
+### 2. 📊 精致数据看板
+
+采用 Markdown 格式，将复杂的视频数据转化为整齐的表格：
+
+- **实时数据**：播放、点赞、投币、收藏、弹幕、评论、分享。
+- **发布详情**：UP主信息、发布时间、视频时长。
+- **智能简介**：自动截断过长的简介，保持界面整洁。
+
+### 3. 🧹 自动清理机制 (Self-Cleaning)
+
+插件内置了 `delayed_delete` 异步任务，所有下载的视频或封面在发送后 **60 秒内自动物理删除**，确保服务器磁盘永不爆满。
+
+## 🛠️ 技术实现
+
+- **异步网络库**：完全基于 `httpx` 异步请求，支持自动跟随重定向（解析 `b23.tv`）。
+- **正则表达式**：精准捕获 `BV号` 及多种格式的 B 站短链接。
+- **并发处理**：下载任务不阻塞机器人主进程。
+
+## 📂 环境依赖
+
+- **AstrBot** 框架
+
+- **Python 依赖**：
+
+  Bash
+
+  ```
+  pip install httpx
+  ```
+
+## 📝 配置文件结构
+
+插件会自动在 `data/bili_temp` 目录下处理临时文件：
+
+```
+.
+├── main.py            # 插件核心逻辑
+└── data/
+    └── bili_temp/     # 临时存放下载的 .mp4 和 .jpg (自动清理)
+```
+
+## 📖 使用示例
+
+1. **短视频场景**：
+
+   - 用户发送：`https://b23.tv/xxxxxx` (视频长度 2:00)
+   - 机器人：发送 Markdown 详情表 -> 提示“正在下载” -> 发送视频文件。
+
+2. **长视频场景**：
+
+   - 用户发送：`BV1xxxxxxx` (视频长度 15:00)
+   - 机器人：发送 Markdown 详情表 -> 发送封面图片 -> 提示“时长超过5分钟，仅展示封面”。
+
+   ![PixPin_2026-03-24_16-35-00](C:\Users\mjr\AppData\Local\PixPin\Temp\PixPin_2026-03-24_16-35-00.png)
+
+![328ad616400fddad212cbdefc018e57a](C:\Users\mjr\Documents\Tencent Files\2793919893\nt_qq\nt_data\Pic\2026-03\Ori\328ad616400fddad212cbdefc018e57a.png)
+
+这里默认回复的格式是md格式的介绍.建议搭配md相关的插件
+
+## ⚠️ 免责声明
+
+本插件仅供学习与交流使用，解析数据均来自 Bilibili 公开接口。请尊重内容创作者，遵守相关法律法规，请勿用于非法用途。
+
