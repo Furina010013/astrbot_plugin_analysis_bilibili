@@ -68,9 +68,10 @@
    - 用户发送：`BV1xxxxxxx` (视频长度 15:00)
    - 机器人：发送 Markdown 详情表 -> 发送封面图片 -> 提示“时长超过5分钟，仅展示封面”。
 
-   ![PixPin_2026-03-24_16-35-00](C:\Users\mjr\AppData\Local\PixPin\Temp\PixPin_2026-03-24_16-35-00.png)
+<img width="431" height="939" alt="PixPin_2026-03-24_16-59-56" src="https://github.com/user-attachments/assets/181abbbf-e781-4d7a-9ca9-3384c0c9fb12" />
 
-![328ad616400fddad212cbdefc018e57a](C:\Users\mjr\Documents\Tencent Files\2793919893\nt_qq\nt_data\Pic\2026-03\Ori\328ad616400fddad212cbdefc018e57a.png)
+<img width="2400" height="4614" alt="328ad616400fddad212cbdefc018e57a" src="https://github.com/user-attachments/assets/cb04eba5-4df8-47ca-a7bc-f051e7f9eecd" />
+
 
 这里默认回复的格式是md格式的介绍.建议搭配md相关的插件
 
