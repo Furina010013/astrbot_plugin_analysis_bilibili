@@ -13,7 +13,7 @@ from astrbot.api import logger, AstrBotConfig
 from astrbot.api.message_components import Plain, Image, Video
 
 
-@register("bilibili_analysis", "YourName", "B站解析下载-标准规范版", "1.3.1")
+@register("bilibili_analysis", "Furina", "B站解析下载", "1.3.1")
 class BiliParserPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
