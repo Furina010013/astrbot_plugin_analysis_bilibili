@@ -1,1 +1,3 @@
-httpx>=0.27.0
+# Bilibili Analysis Plugin Dependencies
+# 异步 HTTP 客户端，用于 API 请求和文件流下载
+httpx>=0.24.0

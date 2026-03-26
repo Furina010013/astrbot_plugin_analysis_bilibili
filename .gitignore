@@ -1,13 +1,18 @@
-# 忽略 Python 缓存
+# Python 编译文件
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
 
-# 忽略临时下载的视频和封面（防止仓库爆满）
-data/bili_temp/
-*.mp4
-*.jpg
-*.jpeg
+# 插件运行产生的临时数据和视频文件 (非常重要！)
+# 忽略所有在 data/ 目录下的内容，因为这些是本地运行产生的
+data/
+bili_temp/
 
-# 忽略 IDE 配置
-.vscode/
-.idea/
+# 操作系统相关
+.DS_Store
+Thumbs.db
+
+# 虚拟环境
+venv/
+.venv/
+env/

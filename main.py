@@ -3,19 +3,30 @@ import re
 import asyncio
 import httpx
 import datetime
+from pathlib import Path  # 确保导入了 Path
 from astrbot.api.event import filter, AstrMessageEvent
 from astrbot.api.star import Context, Star, register
-from astrbot.api import logger
+from astrbot.api import logger, AstrBotConfig
 from astrbot.api.message_components import Plain, Image, Video
+from astrbot.core.utils.astrbot_path import get_astrbot_data_path
 
 
-@register("bilibili_analysis", "YourName", "B站解析下载-逻辑优化版", "1.1.2")
+@register("bilibili_analysis", "YourName", "B站解析下载-逻辑优化版", "1.2.2")
 class BiliParserPlugin(Star):
-    def __init__(self, context: Context):
+    def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
-        self.temp_dir = "data/bili_temp"
+
+        # 1. 确保 config 不为 None
+        self.config = config if config is not None else {}
+
+        # 2. 【核心修复】：使用 Path() 包装字符串，确保可以使用 / 拼接路径
+        # 或者使用 os.path.join 这种更传统但稳健的方式
+        base_path = Path(get_astrbot_data_path())
+        self.temp_dir = base_path / "plugin_data" / "bilibili_analysis"
+
+        # 3. 确保目录存在
         if not os.path.exists(self.temp_dir):
-            os.makedirs(self.temp_dir)
+            os.makedirs(self.temp_dir, exist_ok=True)
 
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -63,7 +74,7 @@ class BiliParserPlugin(Star):
         desc = v.get('desc', '无简介').strip()
         if len(desc) > 150: desc = desc[:150] + "..."
 
-        # 3. 第一次发送：纯 Markdown 介绍
+        # 3. 发送介绍
         detail_md = (
             f"### {title}\n"
             f"👤 **UP主**: {owner['name']}  |  🕒 **发布**: {pubdate}\n"
@@ -79,36 +90,33 @@ class BiliParserPlugin(Star):
         )
         yield event.plain_result(detail_md)
 
-        # 4. 第二次发送逻辑判断
-        if duration > 300:
-            # 超过300秒：发送封面图
-            # 同样先下载封面，避免防盗链
+        # 4. 读取配置阈值
+        threshold = self.config.get("video_duration_threshold", 300)
+
+        if duration > threshold:
             img_path = await self.download_file(pic_url, f"{bvid}_cover.jpg")
             if img_path:
                 yield event.chain_result([
                     Image.fromFileSystem(img_path),
-                    Plain("\n⚠️ 视频时长超过5分钟，仅展示封面。")
+                    Plain(f"\n⚠️ 视频时长超过 {threshold} 秒，仅展示封面。")
                 ])
                 asyncio.create_task(self.delayed_delete(img_path))
             else:
                 yield event.plain_result("❌ 封面图下载失败。")
         else:
-            # 没超过300秒：下载并发送视频
             video_url = await self.fetch_video_url(bvid, cid)
             if video_url:
-                # 状态提示
                 yield event.plain_result("🚀 视频较短，正在下载文件...")
-
                 video_path = await self.download_file(video_url, f"{bvid}.mp4")
                 if video_path:
-                    # 发送视频文件
                     yield event.chain_result([Video.fromFileSystem(video_path)])
-                    # 1分钟后删除视频
                     asyncio.create_task(self.delayed_delete(video_path))
                 else:
                     yield event.plain_result("❌ 视频下载失败。")
             else:
                 yield event.plain_result("❌ 无法解析视频直链。")
+
+    # --- 工具方法 ---
 
     async def fetch_video_info(self, bvid: str):
         url = "https://api.bilibili.com/x/web-interface/view"
@@ -130,7 +138,8 @@ class BiliParserPlugin(Star):
                 return None
 
     async def download_file(self, url: str, filename: str):
-        path = os.path.join(self.temp_dir, filename)
+        # 确保这里也是路径对象操作
+        path = self.temp_dir / filename
         try:
             async with httpx.AsyncClient(headers=self.headers, timeout=120) as client:
                 async with client.stream("GET", url) as resp:
@@ -138,7 +147,7 @@ class BiliParserPlugin(Star):
                         with open(path, "wb") as f:
                             async for chunk in resp.aiter_bytes():
                                 f.write(chunk)
-                        return path
+                        return str(path)
         except Exception as e:
             logger.error(f"下载失败: {e}")
         return None
@@ -149,5 +158,5 @@ class BiliParserPlugin(Star):
             try:
                 os.remove(path)
                 logger.info(f"清理临时文件: {path}")
-            except:
-                pass
+            except Exception as e:
+                logger.error(f"清理失败: {e}")

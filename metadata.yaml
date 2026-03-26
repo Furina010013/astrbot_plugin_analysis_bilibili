@@ -1,5 +1,5 @@
-name: bilibili_analysis
-display_name: B站解析增强版
+name: astrbot_plugin_bilibili_analysis
+display_name: B站解析简易版
 description: 自动解析B站链接,获取视频信息和视频。
 author: Furina
 version: "1.2.0"

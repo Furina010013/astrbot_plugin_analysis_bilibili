@@ -1,0 +1,8 @@
+{
+  "video_duration_threshold": {
+    "description": "视频下载时长阈值 (秒)",
+    "type": "int",
+    "default": 300,
+    "hint": "当视频时长超过此值时，仅发送封面；否则下载并发送视频文件。"
+  }
+}
