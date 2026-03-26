@@ -1,7 +1,8 @@
-name: astrbot_plugin_bilibili_analysis
+name: astrbot_plugin_analysis_bilibili
 display_name: B站解析简易版
-description: 自动解析B站链接,获取视频信息和视频。
+description: 会发送视频的点赞和收藏等基本信息.然后根据设置的阈值判断发送封面,还是发送视频.
 author: Furina
 version: "1.2.0"
+repo: "https://github.com/Furina010013/astrbot_plugin_analysis_bilibili"
 support_platforms:
   - aiocqhttp
