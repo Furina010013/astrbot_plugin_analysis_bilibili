@@ -15,6 +15,11 @@
 
 下载安装包,在astrbot插件市场安装
 
+##使用示例
+<img width="1080" height="5168" alt="Image_1774496007464_56" src="https://github.com/user-attachments/assets/d3c35692-551b-4b13-9f6d-d542001e1ee4" />
+<img width="2400" height="3687" alt="3b632a30970586cee2cd7553c769eeec" src="https://github.com/user-attachments/assets/780ad8b8-e1e2-40d6-b232-c16236347b09" />
+<img width="1078" height="278" alt="PixPin_2026-03-26_11-35-19" src="https://github.com/user-attachments/assets/f7129d22-57d2-414f-945e-d4d42d5532d2" />
+
 ## ⚙️ 插件配置
 
 你可以在 AstrBot 管理面板的“插件配置”中找到本项目，进行以下设置：
