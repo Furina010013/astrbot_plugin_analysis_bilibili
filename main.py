@@ -13,7 +13,7 @@ from astrbot.api import logger, AstrBotConfig
 from astrbot.api.message_components import Plain, Image, Video
 
 
-@register("bilibili_analysis", "Furina", "B站解析下载", "1.3.3")
+@register("bilibili_analysis", "Furina", "B站解析下载", "1.3.4")
 class BiliParserPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
@@ -46,7 +46,6 @@ class BiliParserPlugin(Star):
         v = video_data.get('data', {})
         cid = v.get('cid')
         duration = v.get('duration', 0)
-        pic_url = v.get('pic')
 
         desc = (v.get('desc') or '无简介').strip()
         if len(desc) > 150: desc = desc[:150] + "..."
@@ -77,7 +76,7 @@ class BiliParserPlugin(Star):
 
         # 3. 根据时长决定分发逻辑
         if duration > threshold:
-            async for res in self.handle_cover_send(event, bvid, pic_url, threshold, video_url):
+            async for res in self.handle_long_video_send(event, bvid, duration, threshold, video_url):
                 yield res
         else:
             async for res in self.handle_video_send(event, bvid, video_url):
@@ -124,19 +123,13 @@ class BiliParserPlugin(Star):
         else:
             yield event.plain_result("❌ 视频下载失败（可能文件过大）。")
 
-    async def handle_cover_send(self, event: AstrMessageEvent, bvid: str, pic_url: str, threshold: int, video_url: str):
-        '''处理并发送超长视频的封面及直链，发送后立即清理'''
-        path = await self.download_file(pic_url, f"{bvid}_cover.jpg")
-        if path:
-            try:
-                yield event.chain_result([
-                    Image.fromFileSystem(str(path)),
-                    Plain(f"\n⚠️ 视频超过设定阈值 ({threshold}s)，为您发送视频解析直链：\n🔗 直链: {video_url}")
-                ])
-            finally:
-                if path.exists():
-                    path.unlink()
-                    logger.info(f"已清理封面临时文件: {path}")
+    async def handle_long_video_send(self, event: AstrMessageEvent, bvid: str, duration: int, threshold: int, video_url: str):
+        '''处理超长视频，仅发送直链提示'''
+        warning_text = (
+            f"⚠️ 视频时长({duration}s)超过设定阈值({threshold}s)，为避免刷屏，请点击解析直链观看：\n"
+            f"🔗 直链: {video_url}"
+        )
+        yield event.plain_result(warning_text)
 
     async def download_file(self, url: str, suffix: str) -> Optional[Path]:
         filename = f"{uuid.uuid4().hex}_{suffix}"
