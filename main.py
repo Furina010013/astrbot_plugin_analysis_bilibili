@@ -13,13 +13,13 @@ from astrbot.api import logger, AstrBotConfig
 from astrbot.api.message_components import Plain, Image, Video
 
 
-@register("bilibili_analysis", "Furina", "B站解析下载", "1.3.1")
+@register("bilibili_analysis", "Furina", "B站解析下载", "1.3.3")
 class BiliParserPlugin(Star):
     def __init__(self, context: Context, config: AstrBotConfig = None):
         super().__init__(context)
         self.config = config if config is not None else {}
 
-        # 1. 获取持久化目录 (返回 Path 对象)
+        # 获取持久化目录 (返回 Path 对象)
         self.data_dir = StarTools.get_data_dir()
         self.data_dir.mkdir(parents=True, exist_ok=True)
 
@@ -51,19 +51,36 @@ class BiliParserPlugin(Star):
         desc = (v.get('desc') or '无简介').strip()
         if len(desc) > 150: desc = desc[:150] + "..."
 
+        # 1. 先发送图文混合的详情卡片
         yield event.plain_result(self.build_detail_md(v, desc))
 
+        # 读取配置阈值
         try:
             threshold = int(self.config.get("video_duration_threshold", 300))
         except:
             threshold = 300
 
-        # 处理媒体发送
+        # 2. 获取真实的 MP4 直链
+        video_url = ""
+        if cid:
+            api_url = "https://api.bilibili.com/x/player/playurl"
+            params = {"bvid": bvid, "cid": cid, "qn": 64, "platform": "html5", "high_quality": 1}
+            try:
+                resp = await self.client.get(api_url, params=params)
+                video_url = resp.json().get('data', {}).get('durl', [{}])[0].get('url', '')
+            except Exception as e:
+                logger.error(f"获取视频直链异常: {e}")
+
+        if not video_url:
+            yield event.plain_result("❌ 获取视频直链失败，可能需要大会员或视频已下架。")
+            return
+
+        # 3. 根据时长决定分发逻辑
         if duration > threshold:
-            async for res in self.handle_cover_send(event, bvid, pic_url, threshold):
+            async for res in self.handle_cover_send(event, bvid, pic_url, threshold, video_url):
                 yield res
         else:
-            async for res in self.handle_video_send(event, bvid, cid):
+            async for res in self.handle_video_send(event, bvid, video_url):
                 yield res
 
     async def extract_bvid(self, text: str) -> Optional[str]:
@@ -71,7 +88,6 @@ class BiliParserPlugin(Star):
             match = re.search(r"https?://b23\.tv/[0-9A-Za-z]+", text)
             if match:
                 try:
-                    # 使用 GET 请求跟随跳转，因为 HEAD 有时会被 B 站拒绝
                     resp = await self.client.get(match.group(0), timeout=5.0)
                     final_url = str(resp.url)
                     bv_match = re.search(r"video/(BV[0-9A-Za-z]{10})", final_url)
@@ -92,35 +108,35 @@ class BiliParserPlugin(Star):
             logger.error(f"详情请求异常: {e}")
         return None
 
-    async def handle_video_send(self, event: AstrMessageEvent, bvid: str, cid: int):
-        if not cid: return
-        api_url = "https://api.bilibili.com/x/player/playurl"
-        params = {"bvid": bvid, "cid": cid, "qn": 64, "platform": "html5", "high_quality": 1}
+    async def handle_video_send(self, event: AstrMessageEvent, bvid: str, video_url: str):
+        '''处理并发送短视频，发送后立即清理'''
+        yield event.plain_result("🚀 正在下载视频文件...")
+        path = await self.download_file(video_url, f"{bvid}.mp4")
+        if path:
+            try:
+                # 挂起协程，等待平台发送视频
+                yield event.chain_result([Video.fromFileSystem(str(path))])
+            finally:
+                # 平台发送完毕，恢复协程立刻清理
+                if path.exists():
+                    path.unlink()
+                    logger.info(f"已清理视频临时文件: {path}")
+        else:
+            yield event.plain_result("❌ 视频下载失败（可能文件过大）。")
 
-        try:
-            resp = await self.client.get(api_url, params=params)
-            video_url = resp.json().get('data', {}).get('durl', [{}])[0].get('url')
-
-            if video_url:
-                yield event.plain_result("🚀 正在下载视频文件...")
-                path = await self.download_file(video_url, f"{bvid}.mp4")
-                if path:
-                    yield event.chain_result([Video.fromFileSystem(str(path))])
-                    asyncio.create_task(self.delayed_delete(path))
-                else:
-                    yield event.plain_result("❌ 视频下载失败（可能文件过大）。")
-        except Exception as e:
-            logger.error(f"视频发送异常: {e}")
-
-    async def handle_cover_send(self, event: AstrMessageEvent, bvid: str, pic_url: str, threshold: int):
-        if not pic_url: return
+    async def handle_cover_send(self, event: AstrMessageEvent, bvid: str, pic_url: str, threshold: int, video_url: str):
+        '''处理并发送超长视频的封面及直链，发送后立即清理'''
         path = await self.download_file(pic_url, f"{bvid}_cover.jpg")
         if path:
-            yield event.chain_result([
-                Image.fromFileSystem(str(path)),
-                Plain(f"\n⚠️ 视频超过 {threshold}s，仅展示封面。")
-            ])
-            asyncio.create_task(self.delayed_delete(path))
+            try:
+                yield event.chain_result([
+                    Image.fromFileSystem(str(path)),
+                    Plain(f"\n⚠️ 视频超过设定阈值 ({threshold}s)，为您发送视频解析直链：\n🔗 直链: {video_url}")
+                ])
+            finally:
+                if path.exists():
+                    path.unlink()
+                    logger.info(f"已清理封面临时文件: {path}")
 
     async def download_file(self, url: str, suffix: str) -> Optional[Path]:
         filename = f"{uuid.uuid4().hex}_{suffix}"
@@ -145,18 +161,12 @@ class BiliParserPlugin(Star):
         owner = v.get('owner', {})
         pubdate = datetime.datetime.fromtimestamp(v.get('pubdate', 0)).strftime('%Y-%m-%d %H:%M')
         return (
-            f"### {v.get('title')}\n"
-            f"👤 **UP主**: {owner.get('name')}  |  🕒 **发布**: {pubdate}\n"
+            f"### 标题:{v.get('title')}\n"
+            f"👤 **UP主**: {owner.get('name')}\n"
+            f" 🕒 **发布**: {pubdate}\n"
             f"--- \n"
             f"| 播放 | 点赞 | 投币 |\n"
             f"| :--- | :--- | :--- |\n"
             f"| {stat.get('view', 0)} | {stat.get('like', 0)} | {stat.get('coin', 0)} |\n\n"
             f"> **视频简介**：\n> {desc}"
         )
-
-    async def delayed_delete(self, path: Path):
-        await asyncio.sleep(60)
-        try:
-            if path.exists(): path.unlink()
-        except:
-            pass
